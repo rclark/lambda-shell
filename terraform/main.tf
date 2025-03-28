@@ -1,0 +1,88 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.93.0"
+    }
+
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.2.3"
+    }
+  }
+}
+
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
+
+resource "aws_iam_role" "lambda_execution_role" {
+  name = "lambda-shell"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_execution_role_attachment" {
+  role       = aws_iam_role.lambda_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_ecr_repository" "lambda-shell" {
+  name = "lambda-shell"
+}
+
+resource "aws_ecr_repository_policy" "lambda-access" {
+  repository = aws_ecr_repository.lambda-shell.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+        ]
+      }
+    ]
+  })
+}
+
+resource "null_resource" "docker_build_and_push" {
+  depends_on = [aws_ecr_repository.lambda-shell]
+
+  provisioner "local-exec" {
+    command = <<EOT
+      cd ../lambda
+      docker build --platform linux/amd64 -t ${aws_ecr_repository.lambda-shell.repository_url} .
+      aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${aws_ecr_repository.lambda-shell.repository_url}
+      docker push ${aws_ecr_repository.lambda-shell.repository_url}:latest
+    EOT
+  }
+}
+
+resource "aws_lambda_function" "lambda-shell" {
+  depends_on    = [null_resource.docker_build_and_push]
+  function_name = "lambda-shell"
+  role          = aws_iam_role.lambda_execution_role.arn
+  package_type  = "Image"
+
+  image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${resource.aws_ecr_repository.lambda-shell.name}:latest"
+
+  timeout = 300
+}
