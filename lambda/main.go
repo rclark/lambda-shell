@@ -16,11 +16,14 @@ func main() {
 	lambda.Start(func(ctx context.Context, input Input) error {
 		cmd := exec.Command("sh", "-c", input.Command)
 		output, err := cmd.CombinedOutput()
-		if err != nil {
-			return err
-		}
 
 		fmt.Println(string(output))
-		return nil
+
+		if ee, ok := err.(*exec.ExitError); ok {
+			fmt.Println("\033[31mError:\033[0m", string(ee.Error()))
+			return nil
+		}
+
+		return err
 	})
 }

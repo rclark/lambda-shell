@@ -9,11 +9,24 @@ terraform {
       source  = "hashicorp/null"
       version = "~> 3.2.3"
     }
+
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.4.3"
+    }
   }
 }
 
 data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
+
+resource "random_string" "tag" {
+  length  = 8
+  special = false
+  keepers = {
+    timestamp = timestamp()
+  }
+}
 
 resource "aws_iam_role" "lambda_execution_role" {
   name = "lambda-shell"
@@ -66,12 +79,16 @@ resource "aws_ecr_repository_policy" "lambda-access" {
 resource "null_resource" "docker_build_and_push" {
   depends_on = [aws_ecr_repository.lambda-shell]
 
+  triggers = {
+    always_run = timestamp()
+  }
+
   provisioner "local-exec" {
     command = <<EOT
       cd ../lambda
-      docker build --platform linux/amd64 -t ${aws_ecr_repository.lambda-shell.repository_url} .
+      docker build --platform linux/amd64 -t ${aws_ecr_repository.lambda-shell.repository_url}:${random_string.tag.result} .
       aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${aws_ecr_repository.lambda-shell.repository_url}
-      docker push ${aws_ecr_repository.lambda-shell.repository_url}:latest
+      docker push ${aws_ecr_repository.lambda-shell.repository_url}:${random_string.tag.result}
     EOT
   }
 }
@@ -82,7 +99,7 @@ resource "aws_lambda_function" "lambda-shell" {
   role          = aws_iam_role.lambda_execution_role.arn
   package_type  = "Image"
 
-  image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${resource.aws_ecr_repository.lambda-shell.name}:latest"
+  image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${resource.aws_ecr_repository.lambda-shell.name}:${random_string.tag.result}"
 
   timeout = 300
 }
