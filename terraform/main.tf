@@ -19,6 +19,7 @@ terraform {
 
 data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
+data "aws_partition" "current" {}
 
 resource "random_string" "tag" {
   length  = 8
@@ -48,7 +49,7 @@ resource "aws_iam_role" "lambda_execution_role" {
 
 resource "aws_iam_role_policy_attachment" "lambda_execution_role_attachment" {
   role       = aws_iam_role.lambda_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 resource "aws_ecr_repository" "lambda-shell" {
@@ -86,7 +87,7 @@ resource "null_resource" "docker_build_and_push" {
   provisioner "local-exec" {
     command = <<EOT
       cd ../lambda
-      docker build --platform linux/amd64 -t ${aws_ecr_repository.lambda-shell.repository_url}:${random_string.tag.result} .
+      docker build --platform linux/amd64 --provenance false --sbom false -t ${aws_ecr_repository.lambda-shell.repository_url}:${random_string.tag.result} .
       aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${aws_ecr_repository.lambda-shell.repository_url}
       docker push ${aws_ecr_repository.lambda-shell.repository_url}:${random_string.tag.result}
     EOT

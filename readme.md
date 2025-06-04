@@ -6,16 +6,24 @@ A Lambda function to run arbitrary shell commands on, and a helper tool for invo
 
 Make sure you have these tools installed:
 
-- Terraform
-- Docker
-- AWS CLI
+- Terraform: `brew install terraform`
+- Docker: [Docker for Mac](https://docs.docker.com/desktop/setup/install/mac-install/)
+- AWS CLI: [Installation instructions](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+- Go: `brew install go`
 
 And make sure that your shell is able to acquire AWS credentials.
 
 ## Setup
 
+One-time Terraform initialization:
+
 ```sh
-# Update the lambda function...
+make init
+```
+
+Whenever you want to create or update the Lambda function:
+
+```sh
 make apply
 ```
 
