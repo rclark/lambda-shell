@@ -16,6 +16,16 @@ RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /go/bin/app
 
 FROM public.ecr.aws/lambda/go
 
+RUN yum install -y curl bind-utils
+
+WORKDIR /opt/usr/local/aws-cli
+
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install
+
+WORKDIR ${LAMBDA_TASK_ROOT}
+
 COPY --from=build /go/bin/app /${LAMBDA_TASK_ROOT}
 
 ENTRYPOINT [ "./app" ]

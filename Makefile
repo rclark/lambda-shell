@@ -4,6 +4,9 @@ init:
 apply:
 	@cd terraform && terraform apply
 
+destroy:
+	@cd terraform && terraform destroy
+
 sh:
 	@cd cmd && go run . $(filter-out $@,$(MAKECMDGOALS))
 

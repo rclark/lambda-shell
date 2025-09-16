@@ -44,16 +44,29 @@ resource "aws_iam_role" "lambda_execution_role" {
       }
     ]
   })
+}
 
+data "aws_iam_policy" "lambda_vpc" {
+  name = "AWSLambdaVPCAccessExecutionRole"
+}
+
+data "aws_iam_policy" "lambda_basic_execution_role" {
+  name = "AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_vpc_attachment" {
+  role       = aws_iam_role.lambda_execution_role.name
+  policy_arn = data.aws_iam_policy.lambda_vpc.arn
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_execution_role_attachment" {
   role       = aws_iam_role.lambda_execution_role.name
-  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  policy_arn = data.aws_iam_policy.lambda_basic_execution_role.arn
 }
 
 resource "aws_ecr_repository" "lambda-shell" {
   name = "lambda-shell"
+  force_delete = true
 }
 
 resource "aws_ecr_repository_policy" "lambda-access" {
