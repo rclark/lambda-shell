@@ -26,6 +26,6 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
 
 WORKDIR ${LAMBDA_TASK_ROOT}
 
-COPY --from=build /go/bin/app /${LAMBDA_TASK_ROOT}
+COPY --from=build /go/bin/app ${LAMBDA_TASK_ROOT}
 
 ENTRYPOINT [ "./app" ]
