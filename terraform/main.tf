@@ -21,6 +21,18 @@ data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 
+variable "subnet_ids" {
+  description = "List of subnet IDs for Lambda VPC configuration"
+  type        = list(string)
+  default     = []
+}
+
+variable "security_group_ids" {
+  description = "List of security group IDs for Lambda VPC configuration"
+  type        = list(string)
+  default     = []
+}
+
 resource "random_string" "tag" {
   length  = 8
   special = false
@@ -65,7 +77,7 @@ resource "aws_iam_role_policy_attachment" "lambda_execution_role_attachment" {
 }
 
 resource "aws_ecr_repository" "lambda-shell" {
-  name = "lambda-shell"
+  name         = "lambda-shell"
   force_delete = true
 }
 
@@ -116,4 +128,12 @@ resource "aws_lambda_function" "lambda-shell" {
   image_uri = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${resource.aws_ecr_repository.lambda-shell.name}:${random_string.tag.result}"
 
   timeout = 300
+
+  dynamic "vpc_config" {
+    for_each = length(var.subnet_ids) > 0 ? [1] : []
+    content {
+      subnet_ids         = var.subnet_ids
+      security_group_ids = var.security_group_ids
+    }
+  }
 }
